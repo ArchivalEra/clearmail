@@ -1,0 +1,44 @@
+# Dovecot 服务监听配置 - 极简邮件服务器
+# 占位符: 无
+
+# IMAP 服务 (993 隐式 TLS)
+service imap-login {
+  inet_listener imap {
+    port = 0
+  }
+  inet_listener imaps {
+    port = 993
+    ssl = yes
+  }
+}
+
+# POP3 服务 (995 隐式 TLS)
+service pop3-login {
+  inet_listener pop3 {
+    port = 0
+  }
+  inet_listener pop3s {
+    port = 995
+    ssl = yes
+  }
+}
+
+# 认证服务: 暴露 socket 供 OpenSMTPD SASL 调用
+service auth {
+  unix_listener /var/run/dovecot/auth-userdb {
+    mode = 0666
+    user = root
+    group = root
+  }
+  # SASL socket 供 OpenSMTPD 使用
+  unix_listener auth-client {
+    mode = 0666
+  }
+}
+
+# LMTP 服务 (禁用)
+service lmtp {
+  inet_listener lmtp {
+    port = 0
+  }
+}

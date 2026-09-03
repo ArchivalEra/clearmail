@@ -1,0 +1,18 @@
+# Dovecot 邮件存储配置 - 极简邮件服务器
+# 占位符: 无
+
+# Maildir 格式存储，按用户名分目录
+mail_location = maildir:/var/mail/users/%u/Maildir
+
+# 使用系统用户 UID/GID
+mail_uid = system
+mail_gid = mail
+
+# 邮件进程数限制 (低内存优化)
+mail_max_userip_connections = 10
+
+# 索引文件存储位置
+mail_home = /var/mail/users/%u
+
+# 避免磁盘空间不足时崩溃
+mail_fsync = never

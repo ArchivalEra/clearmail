@@ -1,0 +1,38 @@
+# OpenSMTPD 配置 - 极简邮件服务器
+# 由 generate_config.sh 从模板生成
+# 占位符: {{DOMAIN}} {{MX_HOSTNAME}} {{CERT_PATH}}
+
+# PKI 证书定义
+pki {{MX_HOSTNAME}} cert "{{CERT_PATH}}/fullchain.pem"
+pki {{MX_HOSTNAME}} key  "{{CERT_PATH}}/privkey.pem"
+
+# Milter 过滤器: OpenDKIM (签名+验证)
+filter "dkim" proc-exec "/usr/lib/opendkim/open-dkim" \
+    config "/etc/opendkim.conf"
+
+# 监听端口
+# 25 端口: 入站收信 (STARTTLS 可选，外部 MTA 投递)
+listen on eth0 port 25 tls pki {{MX_HOSTNAME}} filter "dkim"
+
+# 465 端口: 客户端提交发信 (隐式 TLS + SASL 认证)
+listen on eth0 port 465 smtps pki {{MX_HOSTNAME}} auth filter "dkim"
+
+# 587 端口: 客户端提交发信 (STARTTLS 强制 + SASL 认证)
+listen on eth0 port 587 tls-require pki {{MX_HOSTNAME}} auth filter "dkim"
+
+# 投递动作
+# 本地投递: 写入收件人 Maildir
+action "local" maildir "/var/mail/users/%{rcpt.local}/Maildir"
+
+# 外部投递: 通过 DNS 查询目标 MX 并投递
+action "outbound" relay
+
+# 匹配规则
+# 接收本域名入站邮件 (来自任意，目标为本域名) -> 本地投递
+match from any for domain "{{DOMAIN}}" action "local"
+
+# 已认证用户可发往任意域 -> 外部投递
+match from any auth for any action "outbound"
+
+# 本地投递匹配 (本机发信至本域名)
+match for local action "local"

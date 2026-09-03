@@ -1,0 +1,35 @@
+# OpenDKIM 配置 - 极简邮件服务器
+# 由 generate_config.sh 从模板生成
+# 占位符: {{DOMAIN}}
+
+# Milter 监听地址 (供 OpenSMTPD 连接)
+Socket inet:8891@localhost
+
+# 签名域名
+Domain {{DOMAIN}}
+
+# 密钥表与签名表
+KeyTable /etc/opendkim/KeyTable
+SigningTable refile:/etc/opendkim/SigningTable
+
+# DKIM 选择器
+Selector mail
+
+# 模式: 签名(s) + 验证(v)
+Mode sv
+
+# 规范化方法
+Canonicalization relaxed/relaxed
+
+# 最小密钥长度
+MinimumKeyBits 1024
+
+# 日志
+Syslog yes
+LogWhy yes
+
+# 临时目录
+TemporaryDirectory /tmp
+
+# 内部域名 (信任，可签名)
+InternalHosts 127.0.0.1/8,::1

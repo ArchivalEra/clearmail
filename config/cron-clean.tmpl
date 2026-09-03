@@ -1,0 +1,6 @@
+# cron 清理任务 - 极简邮件服务器
+# 由 generate_config.sh 从模板生成
+# 每 10 分钟检查 Maildir 总占用，超过 5GB 时按 FIFO 淘汰最老邮件
+# 占位符: 无 (脚本路径固定)
+
+*/10 * * * * root /opt/mail-server/scripts/clean_maildir.sh

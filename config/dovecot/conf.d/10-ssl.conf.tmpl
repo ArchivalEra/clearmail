@@ -1,0 +1,18 @@
+# Dovecot SSL 配置 - 极简邮件服务器
+# 占位符: {{CERT_PATH}}
+
+# 强制 TLS
+ssl = required
+
+# 证书路径
+ssl_cert = <{{CERT_PATH}}/fullchain.pem
+ssl_key = <{{CERT_PATH}}/privkey.pem
+
+# TLS 版本 (强制 1.2+)
+ssl_min_protocol = TLSv1.2
+
+# 密码套件
+ssl_cipher_list = HIGH:!aNULL:!MD5
+
+# DH 参数
+ssl_dh = </etc/dovecot/dh.pem

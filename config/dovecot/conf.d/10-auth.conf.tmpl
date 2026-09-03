@@ -1,0 +1,20 @@
+# Dovecot 认证配置 - 极简邮件服务器
+# 占位符: 无
+
+# 认证进程数
+auth_worker_max_count = 2
+
+# 认证缓存 TTL
+auth_cache_ttl = 1 hour
+auth_cache_negative_ttl = 1 hour
+
+# PAM 认证服务名
+passdb {
+  driver = pam
+  args = dovecot
+}
+
+# 用户数据库: 系统 passwd
+userdb {
+  driver = passwd
+}

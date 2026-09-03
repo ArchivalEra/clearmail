@@ -1,0 +1,42 @@
+# 白名单模式：默认忽略所有文件，仅追踪指定文件/目录
+
+# 忽略一切
+*
+
+# 允许目录结构（git 需要目录有被追踪的文件才能存在）
+# 逐个放行需要追踪的文件
+
+# 根目录文件
+!/.gitignore
+!/README.md
+!/install.sh
+
+# config 目录
+!/config/
+!/config/opensmtpd.conf.tmpl
+!/config/opendkim.conf.tmpl
+!/config/KeyTable.tmpl
+!/config/SigningTable.tmpl
+!/config/cron-clean.tmpl
+!/config/dovecot/
+!/config/dovecot/dovecot.conf.tmpl
+!/config/dovecot/conf.d/
+!/config/dovecot/conf.d/10-auth.conf.tmpl
+!/config/dovecot/conf.d/10-mail.conf.tmpl
+!/config/dovecot/conf.d/10-ssl.conf.tmpl
+!/config/dovecot/conf.d/10-master.conf.tmpl
+
+# scripts 目录
+!/scripts/
+!/scripts/generate_config.sh
+!/scripts/create_account.sh
+!/scripts/delete_account.sh
+!/scripts/change_password.sh
+!/scripts/list_accounts.sh
+!/scripts/clean_maildir.sh
+!/scripts/verify_deployment.sh
+!/scripts/TEST-CHECKLIST.md
+
+# acme 目录
+!/acme/
+!/acme/deploy-hook.sh

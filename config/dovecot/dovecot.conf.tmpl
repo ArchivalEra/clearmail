@@ -1,0 +1,22 @@
+# Dovecot 主配置 - 极简邮件服务器
+# 由 generate_config.sh 从模板生成
+# 占位符: {{DOMAIN}} {{MX_HOSTNAME}} {{CERT_PATH}}
+
+# 启用协议
+protocols = imap pop3
+
+# 监听所有接口
+listen = *
+
+# 禁止明文认证 (强制 TLS)
+disable_plaintext_auth = yes
+
+# 认证机制
+auth_mechanisms = plain login
+
+# 日志
+log_path = /var/log/dovecot.log
+info_log_path = /var/log/dovecot-info.log
+
+# 包含 conf.d 下配置
+!include conf.d/*.conf

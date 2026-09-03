@@ -1,0 +1,6 @@
+# OpenDKIM KeyTable - 极简邮件服务器
+# 由 generate_config.sh 从模板生成
+# 占位符: {{DOMAIN}}
+# 格式: <keyname> <domain>:<selector>:<private-key-path>
+
+mail._domainkey.{{DOMAIN}} {{DOMAIN}}:mail:/etc/opendkim/keys/{{DOMAIN}}.private
