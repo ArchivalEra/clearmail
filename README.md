@@ -65,10 +65,13 @@ git clone git@github.com:ArchivalEra/clearmail.git /opt/mail-server
 cd /opt/mail-server
 chmod +x install.sh scripts/*.sh acme/*.sh
 
-./install.sh --domain=example.com --email=admin@example.com
+./install.sh --domain=baidu.com --email=admin@baidu.com --mx-hostname=mail.baidu.com
 ```
 
-`--domain` 就是邮箱域名，填 `baidu.com` 邮箱就是 `xxx@baidu.com`。MX 主机名固定为 `mail.<domain>`。
+三个参数完全独立：
+- `--domain`：邮箱域名，填 `baidu.com` 邮箱就是 `xxx@baidu.com`
+- `--mx-hostname`：MX 主机名，通常 `mail.<domain>`，但也可以是任意主机名如 `mx.xiaomi.com`
+- `--email`：Let's Encrypt 注册邮箱，仅用于证书到期通知
 
 脚本会：
 1. 安装 OpenSMTPD、Dovecot、OpenDKIM、acme.sh
