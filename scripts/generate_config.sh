@@ -3,9 +3,9 @@
 # 根据用户输入参数替换所有模板中的占位符，输出到对应系统路径
 #
 # 用法: generate_config.sh --domain=<domain> --mx-hostname=<mx> --cert-path=<path>
-# 退出码: 0=成功, 1=参数错误
+# 退出码: 0=成功, 1=参数错误, 2=环境错误(root/模板目录)
 
-set -euo pipefail
+set -uo pipefail
 
 # 默认值
 DOMAIN=""
@@ -29,6 +29,13 @@ for arg in "$@"; do
         --cert-path=*)
             CERT_PATH="${arg#*=}"
             ;;
+        -h|--help)
+            echo "用法: $0 --domain=<domain> --mx-hostname=<mx> --cert-path=<path>"
+            echo "  --domain      邮箱域名 (必填)"
+            echo "  --mx-hostname MX 主机名 (必填)"
+            echo "  --cert-path   证书路径 (必填)"
+            exit 0
+            ;;
         *)
             echo "错误: 未知参数 '$arg'" >&2
             exit 1
@@ -39,14 +46,37 @@ done
 # 校验必填参数
 if [[ -z "$DOMAIN" ]]; then
     echo "错误: --domain 参数必填" >&2
-    echo "用法: $0 --domain=<domain> --mx-hostname=<mx> --cert-path=<path>" >&2
     exit 1
 fi
 if [[ -z "$MX_HOSTNAME" ]]; then
-    MX_HOSTNAME="mail.$DOMAIN"
+    echo "错误: --mx-hostname 参数必填" >&2
+    exit 1
 fi
 if [[ -z "$CERT_PATH" ]]; then
-    CERT_PATH="/etc/letsencrypt/live/$MX_HOSTNAME"
+    echo "错误: --cert-path 参数必填" >&2
+    exit 1
+fi
+
+# 域名格式校验
+if [[ ! "$DOMAIN" =~ ^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$ ]]; then
+    echo "错误: 域名格式不合法: $DOMAIN" >&2
+    exit 1
+fi
+if [[ ! "$MX_HOSTNAME" =~ ^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$ ]]; then
+    echo "错误: MX 主机名格式不合法: $MX_HOSTNAME" >&2
+    exit 1
+fi
+
+# 检查 root 权限 (需要写入 /etc)
+if [[ $EUID -ne 0 ]]; then
+    echo "错误: 需要 root 权限执行" >&2
+    exit 2
+fi
+
+# 检查模板目录存在
+if [[ ! -d "$CONFIG_DIR" ]]; then
+    echo "错误: 配置模板目录不存在: $CONFIG_DIR" >&2
+    exit 2
 fi
 
 echo "配置生成参数:"
@@ -67,37 +97,44 @@ render_template() {
     fi
 
     # 创建目标目录
-    mkdir -p "$(dirname "$target")"
+    if ! mkdir -p "$(dirname "$target")"; then
+        echo "错误: 无法创建目录 $(dirname "$target")" >&2
+        return 1
+    fi
 
     # 替换占位符
-    sed \
+    if ! sed \
         -e "s|{{DOMAIN}}|${DOMAIN}|g" \
         -e "s|{{MX_HOSTNAME}}|${MX_HOSTNAME}|g" \
         -e "s|{{CERT_PATH}}|${CERT_PATH}|g" \
-        "$tmpl" > "$target"
+        "$tmpl" > "$target"; then
+        echo "错误: 模板渲染失败: $tmpl" >&2
+        return 1
+    fi
 
     echo "  生成: $target"
+    return 0
 }
 
 echo "生成配置文件..."
 
 # 1. OpenSMTPD 配置
-render_template "$CONFIG_DIR/opensmtpd.conf.tmpl" "/etc/opensmtpd.conf"
+render_template "$CONFIG_DIR/opensmtpd.conf.tmpl" "/etc/opensmtpd.conf" || exit 2
 
 # 2. Dovecot 配置
-render_template "$CONFIG_DIR/dovecot/dovecot.conf.tmpl" "/etc/dovecot/dovecot.conf"
-render_template "$CONFIG_DIR/dovecot/conf.d/10-auth.conf.tmpl" "/etc/dovecot/conf.d/10-auth.conf"
-render_template "$CONFIG_DIR/dovecot/conf.d/10-mail.conf.tmpl" "/etc/dovecot/conf.d/10-mail.conf"
-render_template "$CONFIG_DIR/dovecot/conf.d/10-ssl.conf.tmpl" "/etc/dovecot/conf.d/10-ssl.conf"
-render_template "$CONFIG_DIR/dovecot/conf.d/10-master.conf.tmpl" "/etc/dovecot/conf.d/10-master.conf"
+render_template "$CONFIG_DIR/dovecot/dovecot.conf.tmpl" "/etc/dovecot/dovecot.conf" || exit 2
+render_template "$CONFIG_DIR/dovecot/conf.d/10-auth.conf.tmpl" "/etc/dovecot/conf.d/10-auth.conf" || exit 2
+render_template "$CONFIG_DIR/dovecot/conf.d/10-mail.conf.tmpl" "/etc/dovecot/conf.d/10-mail.conf" || exit 2
+render_template "$CONFIG_DIR/dovecot/conf.d/10-ssl.conf.tmpl" "/etc/dovecot/conf.d/10-ssl.conf" || exit 2
+render_template "$CONFIG_DIR/dovecot/conf.d/10-master.conf.tmpl" "/etc/dovecot/conf.d/10-master.conf" || exit 2
 
 # 3. OpenDKIM 配置
-render_template "$CONFIG_DIR/opendkim.conf.tmpl" "/etc/opendkim.conf"
-render_template "$CONFIG_DIR/KeyTable.tmpl" "/etc/opendkim/KeyTable"
-render_template "$CONFIG_DIR/SigningTable.tmpl" "/etc/opendkim/SigningTable"
+render_template "$CONFIG_DIR/opendkim.conf.tmpl" "/etc/opendkim.conf" || exit 2
+render_template "$CONFIG_DIR/KeyTable.tmpl" "/etc/opendkim/KeyTable" || exit 2
+render_template "$CONFIG_DIR/SigningTable.tmpl" "/etc/opendkim/SigningTable" || exit 2
 
 # 4. cron 清理任务
-render_template "$CONFIG_DIR/cron-clean.tmpl" "/etc/cron.d/clean-maildir"
+render_template "$CONFIG_DIR/cron-clean.tmpl" "/etc/cron.d/clean-maildir" || exit 2
 chmod 644 /etc/cron.d/clean-maildir
 
 # 5. 创建 OpenDKIM 密钥目录
@@ -109,17 +146,4 @@ chmod 755 /var/mail/users
 
 echo ""
 echo "配置文件生成完成。"
-echo ""
-echo "生成的文件列表:"
-echo "  /etc/opensmtpd.conf"
-echo "  /etc/dovecot/dovecot.conf"
-echo "  /etc/dovecot/conf.d/10-auth.conf"
-echo "  /etc/dovecot/conf.d/10-mail.conf"
-echo "  /etc/dovecot/conf.d/10-ssl.conf"
-echo "  /etc/dovecot/conf.d/10-master.conf"
-echo "  /etc/opendkim.conf"
-echo "  /etc/opendkim/KeyTable"
-echo "  /etc/opendkim/SigningTable"
-echo "  /etc/cron.d/clean-maildir"
-
 exit 0

@@ -5,7 +5,7 @@
 # 用法: create_account.sh <username> <password>
 # 退出码: 0=成功, 1=参数缺失, 2=用户名格式不合法, 3=密码长度不足, 4=用户已存在
 
-set -euo pipefail
+set -uo pipefail
 
 # Maildir 根目录
 MAILDIR_ROOT="/var/mail/users"
@@ -23,15 +23,27 @@ PASSWORD="$2"
 
 # 校验用户名格式: 小写字母/数字/./-，1-64 字符
 if [[ ! "$USERNAME" =~ ^[a-z0-9.-]{1,64}$ ]]; then
-    echo "错误: 用户名格式不合法" >&2
+    echo "错误: 用户名格式不合法: $USERNAME" >&2
     echo "  规则: 仅含小写字母、数字、点号(.)、连字符(-)，长度 1-64" >&2
     exit 2
 fi
 
 # 校验密码长度 >= 8
 if [[ ${#PASSWORD} -lt 8 ]]; then
-    echo "错误: 密码长度不足，至少 8 个字符" >&2
+    echo "错误: 密码长度不足，至少 8 个字符 (当前 ${#PASSWORD})" >&2
     exit 3
+fi
+
+# 检查 root 权限
+if [[ $EUID -ne 0 ]]; then
+    echo "错误: 需要 root 权限执行" >&2
+    exit 5
+fi
+
+# 检查 Maildir 根目录存在
+if [[ ! -d "$MAILDIR_ROOT" ]]; then
+    mkdir -p "$MAILDIR_ROOT"
+    chmod 755 "$MAILDIR_ROOT"
 fi
 
 # 检查用户是否已存在

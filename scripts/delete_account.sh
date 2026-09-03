@@ -5,7 +5,7 @@
 # 用法: delete_account.sh <username>
 # 退出码: 0=成功, 1=参数缺失, 2=用户不存在
 
-set -euo pipefail
+set -uo pipefail
 
 # 参数校验
 if [[ $# -ne 1 ]]; then
@@ -15,6 +15,12 @@ if [[ $# -ne 1 ]]; then
 fi
 
 USERNAME="$1"
+
+# 检查 root 权限
+if [[ $EUID -ne 0 ]]; then
+    echo "错误: 需要 root 权限执行" >&2
+    exit 3
+fi
 
 # 检查用户是否存在
 if ! id "$USERNAME" >/dev/null 2>&1; then

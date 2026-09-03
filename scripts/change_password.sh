@@ -4,7 +4,7 @@
 # 用法: change_password.sh <username> <newpassword>
 # 退出码: 0=成功, 1=参数缺失, 2=用户不存在, 3=密码长度不足
 
-set -euo pipefail
+set -uo pipefail
 
 # 参数校验
 if [[ $# -ne 2 ]]; then
@@ -25,8 +25,14 @@ fi
 
 # 校验密码长度 >= 8
 if [[ ${#NEWPASSWORD} -lt 8 ]]; then
-    echo "错误: 密码长度不足，至少 8 个字符" >&2
+    echo "错误: 密码长度不足，至少 8 个字符 (当前 ${#NEWPASSWORD})" >&2
     exit 3
+fi
+
+# 检查 root 权限
+if [[ $EUID -ne 0 ]]; then
+    echo "错误: 需要 root 权限执行" >&2
+    exit 4
 fi
 
 # 修改密码
