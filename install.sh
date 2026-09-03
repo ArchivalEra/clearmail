@@ -36,6 +36,7 @@ PROJECT_ROOT="$SCRIPT_DIR"
 DOMAIN=""
 EMAIL=""
 MX_HOSTNAME=""
+GUIDE_EMAIL=""
 
 # 解析参数
 for arg in "$@"; do
@@ -49,13 +50,18 @@ for arg in "$@"; do
         --mx-hostname=*)
             MX_HOSTNAME="${arg#*=}"
             ;;
+        --guide=*)
+            GUIDE_EMAIL="${arg#*=}"
+            ;;
         -h|--help)
             echo "用法: $0 --domain=<domain> --email=<email> --mx-hostname=<mx>"
+            echo "      $0 --guide=<email@domain> --mx-hostname=<mx>"
             echo ""
             echo "参数:"
             echo "  --domain      邮箱域名，如 baidu.com，最终邮箱为 xxx@baidu.com"
             echo "  --email       Let's Encrypt 注册邮箱，用于证书到期通知"
             echo "  --mx-hostname MX 主机名，如 mail.baidu.com 或 mx.xiaomi.com"
+            echo "  --guide       输出客户端配置指引，如 --guide=alice@baidu.com"
             echo ""
             echo "退出码:"
             echo "  0 = 成功"
@@ -72,6 +78,58 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+# --guide 模式: 输出客户端配置指引后退出
+if [[ -n "$GUIDE_EMAIL" ]]; then
+    if [[ ! "$GUIDE_EMAIL" =~ ^([^@]+)@([^@]+)$ ]]; then
+        error "--guide 参数格式不合法，应为 email@domain"
+        exit 1
+    fi
+    GUIDE_USER="${BASH_REMATCH[1]}"
+    GUIDE_DOMAIN="${BASH_REMATCH[2]}"
+
+    if [[ -z "$MX_HOSTNAME" ]]; then
+        error "--guide 模式下 --mx-hostname 参数必填"
+        exit 1
+    fi
+
+    echo ""
+    echo "============================================================"
+    echo "  客户端配置指引: $GUIDE_EMAIL"
+    echo "============================================================"
+    echo ""
+    echo "【IMAP 收信】"
+    echo "  服务器:   $MX_HOSTNAME"
+    echo "  端口:     993"
+    echo "  安全:     SSL/TLS"
+    echo "  用户名:   $GUIDE_EMAIL"
+    echo "  密码:     你的邮箱密码"
+    echo ""
+    echo "【SMTP 发信】"
+    echo "  服务器:   $MX_HOSTNAME"
+    echo "  端口:     465"
+    echo "  安全:     SSL/TLS"
+    echo "  用户名:   $GUIDE_EMAIL"
+    echo "  密码:     你的邮箱密码"
+    echo "  备选端口: 587 (STARTTLS)"
+    echo ""
+    echo "【POP3 收信 (可选)】"
+    echo "  服务器:   $MX_HOSTNAME"
+    echo "  端口:     995"
+    echo "  安全:     SSL/TLS"
+    echo "  用户名:   $GUIDE_EMAIL"
+    echo ""
+    echo "【K-9 Mail 配置步骤】"
+    echo "  1. 打开 K-9 Mail → 添加账户"
+    echo "  2. 输入 $GUIDE_EMAIL 和密码"
+    echo "  3. 选择「手动配置」"
+    echo "  4. 选择 IMAP"
+    echo "  5. 收信服务器: $MX_HOSTNAME  端口: 993  安全: SSL/TLS"
+    echo "  6. 发信服务器: $MX_HOSTNAME  端口: 465  安全: SSL/TLS"
+    echo "  7. 点击「下一步」完成"
+    echo ""
+    exit 0
+fi
 
 # 校验必填参数
 if [[ -z "$DOMAIN" ]]; then
@@ -215,17 +273,36 @@ if [[ -f "$DKIM_PRIVATE" ]]; then
     info "  DKIM 密钥已存在，跳过生成"
 else
     mkdir -p "$DKIM_KEY_DIR"
-    if opendkim-genkey -D "$DKIM_KEY_DIR" -d "$DOMAIN" -s "$DKIM_SELECTOR" 2>/dev/null; then
-        # opendkim-genkey 生成 <selector>.private 和 <selector>.txt
-        mv "$DKIM_KEY_DIR/$DKIM_SELECTOR.private" "$DKIM_PRIVATE" 2>/dev/null || true
-        mv "$DKIM_KEY_DIR/$DKIM_SELECTOR.txt" "$DKIM_PUBLIC" 2>/dev/null || true
-    elif command -v opendkim-genkey >/dev/null 2>&1; then
-        # 某些系统使用不同语法
-        opendkim-genkey -d "$DOMAIN" -s "$DKIM_SELECTOR" -D "$DKIM_KEY_DIR"
-        mv "$DKIM_KEY_DIR/$DKIM_SELECTOR.private" "$DKIM_PRIVATE" 2>/dev/null || true
-        mv "$DKIM_KEY_DIR/$DKIM_SELECTOR.txt" "$DKIM_PUBLIC" 2>/dev/null || true
+
+    # 用 openssl 生成 RSA 2048 密钥对（openssl 是系统标配，不依赖 opendkim-genkey）
+    info "  使用 openssl 生成 DKIM 密钥对..."
+    TMP_KEY=$(mktemp)
+    rm -f "$TMP_KEY"
+
+    # 生成 RSA 私钥
+    if openssl genrsa -out "$TMP_KEY" 2048 2>/dev/null; then
+        # 私钥直接就是 PKCS#1 格式，OpenDKIM 兼容
+        cp "$TMP_KEY" "$DKIM_PRIVATE"
+
+        # 提取公钥的 base64 部分（去掉 PEM 头尾，拼接成单行）
+        PUBKEY_B64=$(openssl rsa -in "$TMP_KEY" -pubout 2>/dev/null \
+            | grep -v '^-' \
+            | tr -d '\n')
+
+        # 写入 DNS TXT 记录文件
+        echo "${DKIM_SELECTOR}._domainkey.$DOMAIN IN TXT \"v=DKIM1; k=rsa; p=$PUBKEY_B64\"" > "$DKIM_PUBLIC"
+
+        rm -f "$TMP_KEY"
     else
-        warn "  opendkim-genkey 不可用，请手动生成 DKIM 密钥"
+        # 回退到 opendkim-genkey
+        if command -v opendkim-genkey >/dev/null 2>&1; then
+            info "  openssl 失败，回退到 opendkim-genkey..."
+            opendkim-genkey -D "$DKIM_KEY_DIR" -d "$DOMAIN" -s "$DKIM_SELECTOR" 2>/dev/null
+            mv "$DKIM_KEY_DIR/$DKIM_SELECTOR.private" "$DKIM_PRIVATE" 2>/dev/null || true
+            mv "$DKIM_KEY_DIR/$DKIM_SELECTOR.txt" "$DKIM_PUBLIC" 2>/dev/null || true
+        else
+            warn "  无法生成 DKIM 密钥，请手动生成"
+        fi
     fi
 
     # 设置密钥文件权限

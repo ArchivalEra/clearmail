@@ -73,6 +73,16 @@ chmod +x install.sh scripts/*.sh acme/*.sh
 - `--mx-hostname`：MX 主机名，通常 `mail.<domain>`，但也可以是任意主机名如 `mx.xiaomi.com`
 - `--email`：Let's Encrypt 注册邮箱，仅用于证书到期通知
 
+### 客户端配置指引
+
+部署后给用户看客户端怎么配：
+
+```bash
+./install.sh --guide=alice@baidu.com --mx-hostname=mail.baidu.com
+```
+
+输出 IMAP/SMTP/POP3 的服务器、端口、安全类型、用户名，以及 K-9 Mail 的操作步骤。
+
 脚本会：
 1. 安装 OpenSMTPD、Dovecot、OpenDKIM、acme.sh
 2. 生成全部配置文件
