@@ -2,7 +2,9 @@
 # install.sh - 极简邮件服务器一键部署脚本
 # 在 Ubuntu 22.04 LTS 上幂等部署 OpenSMTPD + Dovecot + OpenDKIM + acme.sh
 #
-# 用法: install.sh --domain=<domain> --email=<email> [--mx-hostname=<mx>]
+# 用法: install.sh --domain=<domain> --email=<email>
+#   --domain : 邮箱域名，如 baidu.com，最终邮箱为 xxx@baidu.com
+#   --email  : Let's Encrypt 注册邮箱，用于证书到期通知
 # 退出码:
 #   0 = 成功
 #   1 = 参数错误
@@ -32,7 +34,6 @@ PROJECT_ROOT="$SCRIPT_DIR"
 # 默认参数
 DOMAIN=""
 EMAIL=""
-MX_HOSTNAME=""
 
 # 解析参数
 for arg in "$@"; do
@@ -43,16 +44,12 @@ for arg in "$@"; do
         --email=*)
             EMAIL="${arg#*=}"
             ;;
-        --mx-hostname=*)
-            MX_HOSTNAME="${arg#*=}"
-            ;;
         -h|--help)
-            echo "用法: $0 --domain=<domain> --email=<email> [--mx-hostname=<mx>]"
+            echo "用法: $0 --domain=<domain> --email=<email>"
             echo ""
             echo "参数:"
-            echo "  --domain        : 邮件服务域名 (必填)"
-            echo "  --email         : Let's Encrypt 注册邮箱 (必填)"
-            echo "  --mx-hostname   : MX 主机名 (可选，默认 mail.<domain>)"
+            echo "  --domain  邮箱域名，如 baidu.com，最终邮箱为 xxx@baidu.com"
+            echo "  --email   Let's Encrypt 注册邮箱，用于证书到期通知"
             echo ""
             echo "退出码:"
             echo "  0 = 成功"
@@ -72,16 +69,16 @@ done
 
 # 校验必填参数
 if [[ -z "$DOMAIN" ]]; then
-    error "--domain 参数必填"
+    error "--domain 参数必填，如 --domain=baidu.com"
     exit 1
 fi
 if [[ -z "$EMAIL" ]]; then
     error "--email 参数必填"
     exit 1
 fi
-if [[ -z "$MX_HOSTNAME" ]]; then
-    MX_HOSTNAME="mail.$DOMAIN"
-fi
+
+# MX 主机名固定为 mail.<domain>
+MX_HOSTNAME="mail.$DOMAIN"
 
 CERT_PATH="/etc/letsencrypt/live/$MX_HOSTNAME"
 DKIM_SELECTOR="mail"

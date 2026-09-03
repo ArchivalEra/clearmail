@@ -66,8 +66,9 @@ cd /opt/mail-server
 chmod +x install.sh scripts/*.sh acme/*.sh
 
 ./install.sh --domain=example.com --email=admin@example.com
-# 如果 MX 主机名不是 mail.example.com，加 --mx-hostname=mx.example.com
 ```
+
+`--domain` 就是邮箱域名，填 `baidu.com` 邮箱就是 `xxx@baidu.com`。MX 主机名固定为 `mail.<domain>`。
 
 脚本会：
 1. 安装 OpenSMTPD、Dovecot、OpenDKIM、acme.sh
