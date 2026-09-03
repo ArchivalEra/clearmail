@@ -12,13 +12,13 @@ filter "dkim" proc-exec "/usr/lib/opendkim/open-dkim" \
 
 # 监听端口
 # 25 端口: 入站收信 (STARTTLS 可选，外部 MTA 投递)
-listen on eth0 port 25 tls pki {{MX_HOSTNAME}} filter "dkim"
+listen on all port 25 tls pki {{MX_HOSTNAME}} filter "dkim"
 
 # 465 端口: 客户端提交发信 (隐式 TLS + SASL 认证)
-listen on eth0 port 465 smtps pki {{MX_HOSTNAME}} auth filter "dkim"
+listen on all port 465 smtps pki {{MX_HOSTNAME}} auth filter "dkim"
 
 # 587 端口: 客户端提交发信 (STARTTLS 强制 + SASL 认证)
-listen on eth0 port 587 tls-require pki {{MX_HOSTNAME}} auth filter "dkim"
+listen on all port 587 tls-require pki {{MX_HOSTNAME}} auth filter "dkim"
 
 # 投递动作
 # 本地投递: 写入收件人 Maildir

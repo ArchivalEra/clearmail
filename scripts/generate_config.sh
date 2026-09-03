@@ -11,6 +11,7 @@ set -uo pipefail
 DOMAIN=""
 MX_HOSTNAME=""
 CERT_PATH=""
+PROJECT_ROOT=""
 
 # 项目根目录 (脚本所在目录的上一级)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,11 +30,15 @@ for arg in "$@"; do
         --cert-path=*)
             CERT_PATH="${arg#*=}"
             ;;
+        --project-root=*)
+            PROJECT_ROOT="${arg#*=}"
+            ;;
         -h|--help)
-            echo "用法: $0 --domain=<domain> --mx-hostname=<mx> --cert-path=<path>"
-            echo "  --domain      邮箱域名 (必填)"
-            echo "  --mx-hostname MX 主机名 (必填)"
-            echo "  --cert-path   证书路径 (必填)"
+            echo "用法: $0 --domain=<domain> --mx-hostname=<mx> --cert-path=<path> [--project-root=<path>]"
+            echo "  --domain        邮箱域名 (必填)"
+            echo "  --mx-hostname   MX 主机名 (必填)"
+            echo "  --cert-path     证书路径 (必填)"
+            echo "  --project-root  项目根目录 (默认: 自动检测)"
             exit 0
             ;;
         *)
@@ -107,6 +112,7 @@ render_template() {
         -e "s|{{DOMAIN}}|${DOMAIN}|g" \
         -e "s|{{MX_HOSTNAME}}|${MX_HOSTNAME}|g" \
         -e "s|{{CERT_PATH}}|${CERT_PATH}|g" \
+        -e "s|{{PROJECT_ROOT}}|${PROJECT_ROOT}|g" \
         "$tmpl" > "$target"; then
         echo "错误: 模板渲染失败: $tmpl" >&2
         return 1

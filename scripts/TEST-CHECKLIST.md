@@ -135,7 +135,7 @@ nc mail.<domain> 993
 du -sh /var/mail/users/
 
 # 3. 手动触发清理
-/opt/mail-server/scripts/clean_maildir.sh
+./scripts/clean_maildir.sh
 
 # 4. 检查清理后占用
 du -sh /var/mail/users/

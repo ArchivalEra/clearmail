@@ -2,7 +2,7 @@
 # change_password.sh - 修改邮箱账户密码
 #
 # 用法: change_password.sh <username> <newpassword>
-# 退出码: 0=成功, 1=参数缺失, 2=用户不存在, 3=密码长度不足
+# 退出码: 0=成功, 1=参数缺失, 2=用户不存在, 3=密码长度不足, 4=权限不足, 4=权限不足
 
 set -uo pipefail
 

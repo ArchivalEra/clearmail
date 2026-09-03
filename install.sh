@@ -81,12 +81,11 @@ done
 
 # --guide 模式: 输出客户端配置指引后退出
 if [[ -n "$GUIDE_EMAIL" ]]; then
+    # 校验邮箱格式: user@domain
     if [[ ! "$GUIDE_EMAIL" =~ ^([^@]+)@([^@]+)$ ]]; then
         error "--guide 参数格式不合法，应为 email@domain"
         exit 1
     fi
-    GUIDE_USER="${BASH_REMATCH[1]}"
-    GUIDE_DOMAIN="${BASH_REMATCH[2]}"
 
     if [[ -z "$MX_HOSTNAME" ]]; then
         error "--guide 模式下 --mx-hostname 参数必填"
@@ -231,14 +230,18 @@ install_package "opendkim-tools"
 ACME_HOME="/root/.acme.sh"
 if [[ ! -f "$ACME_HOME/acme.sh" ]]; then
     info "  安装 acme.sh..."
-    if [[ ! -d /tmp/acme.sh ]]; then
-        git clone https://github.com/acmesh-official/acme.sh.git /tmp/acme.sh >/dev/null 2>&1 || \
-        curl -sL https://raw.githubusercontent.com/acmesh-official/acme.sh/master/acme.sh -o /tmp/acme.sh-install.sh
-    fi
-    if [[ -d /tmp/acme.sh ]]; then
-        cd /tmp/acme.sh
-        ./acme.sh --install --home "$ACME_HOME" --accountemail "$EMAIL" >/dev/null 2>&1
-        cd "$PROJECT_ROOT"
+    ACME_TMP="/tmp/acme.sh-src"
+    rm -rf "$ACME_TMP"
+    if git clone --depth=1 https://github.com/acmesh-official/acme.sh.git "$ACME_TMP" >/dev/null 2>&1; then
+        (cd "$ACME_TMP" && ./acme.sh --install --home "$ACME_HOME" --accountemail "$EMAIL" >/dev/null 2>&1)
+    else
+        # 回退: 直接下载单文件版
+        curl -sL https://raw.githubusercontent.com/acmesh-official/acme.sh/master/acme.sh -o /tmp/acme.sh-standalone 2>/dev/null
+        if [[ -f /tmp/acme.sh-standalone ]]; then
+            chmod +x /tmp/acme.sh-standalone
+            /tmp/acme.sh-standalone --install --home "$ACME_HOME" --accountemail "$EMAIL" >/dev/null 2>&1
+            rm -f /tmp/acme.sh-standalone
+        fi
     fi
 fi
 
@@ -253,12 +256,34 @@ info "Phase 3: 生成配置文件..."
 if ! "$PROJECT_ROOT/scripts/generate_config.sh" \
     --domain="$DOMAIN" \
     --mx-hostname="$MX_HOSTNAME" \
-    --cert-path="$CERT_PATH"; then
+    --cert-path="$CERT_PATH" \
+    --project-root="$PROJECT_ROOT"; then
     error "配置生成失败"
     exit 2
 fi
 
 success "配置文件生成完成"
+echo ""
+
+# ============================================================
+# Phase 3.5: 生成 Dovecot DH 参数
+# ============================================================
+info "Phase 3.5: 生成 Dovecot DH 参数..."
+
+DH_FILE="/etc/dovecot/dh.pem"
+if [[ -f "$DH_FILE" ]]; then
+    info "  DH 参数已存在，跳过生成"
+else
+    # 2048 位 DH 参数，可能需要 1-2 分钟
+    info "  生成 2048 位 DH 参数 (可能需要 1-2 分钟)..."
+    if openssl dhparam -out "$DH_FILE" 2048 2>/dev/null; then
+        chmod 644 "$DH_FILE"
+        success "  DH 参数生成完成"
+    else
+        warn "  DH 参数生成失败，Dovecot 将使用内置默认值"
+    fi
+fi
+
 echo ""
 
 # ============================================================
@@ -281,16 +306,19 @@ else
 
     # 生成 RSA 私钥
     if openssl genrsa -out "$TMP_KEY" 2048 2>/dev/null; then
-        # 私钥直接就是 PKCS#1 格式，OpenDKIM 兼容
-        cp "$TMP_KEY" "$DKIM_PRIVATE"
-
         # 提取公钥的 base64 部分（去掉 PEM 头尾，拼接成单行）
         PUBKEY_B64=$(openssl rsa -in "$TMP_KEY" -pubout 2>/dev/null \
             | grep -v '^-' \
             | tr -d '\n')
 
-        # 写入 DNS TXT 记录文件
-        echo "${DKIM_SELECTOR}._domainkey.$DOMAIN IN TXT \"v=DKIM1; k=rsa; p=$PUBKEY_B64\"" > "$DKIM_PUBLIC"
+        if [[ -n "$PUBKEY_B64" ]]; then
+            # 私钥复制到目标位置
+            cp "$TMP_KEY" "$DKIM_PRIVATE"
+            # 写入 DNS TXT 记录文件
+            echo "${DKIM_SELECTOR}._domainkey.$DOMAIN IN TXT \"v=DKIM1; k=rsa; p=$PUBKEY_B64\"" > "$DKIM_PUBLIC"
+        else
+            warn "  openssl 公钥提取失败"
+        fi
 
         rm -f "$TMP_KEY"
     else

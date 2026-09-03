@@ -8,6 +8,7 @@
 
 # 根目录文件
 !/.gitignore
+!/LICENSE
 !/README.md
 !/install.sh
 

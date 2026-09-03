@@ -3,4 +3,4 @@
 # 每 10 分钟检查 Maildir 总占用，超过 5GB 时按 FIFO 淘汰最老邮件
 # 占位符: 无 (脚本路径固定)
 
-*/10 * * * * root /opt/mail-server/scripts/clean_maildir.sh
+*/10 * * * * root {{PROJECT_ROOT}}/scripts/clean_maildir.sh

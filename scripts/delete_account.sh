@@ -3,7 +3,7 @@
 # 删除系统用户及其 Maildir 目录
 #
 # 用法: delete_account.sh <username>
-# 退出码: 0=成功, 1=参数缺失, 2=用户不存在
+# 退出码: 0=成功, 1=参数缺失, 2=用户不存在, 3=权限不足
 
 set -uo pipefail
 
